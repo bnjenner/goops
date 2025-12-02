@@ -15,5 +15,10 @@ def main():
     parser.add_argument("fasta", help="Input Fasta file.")
     args = parser.parse_args()
 
+
+    #fasta = util.readfasta(args.input)
+    #output = motif.discover(fasta)
+    # write output file i guess
+
 if __name__ == "__main__":
     main()
