@@ -12,7 +12,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="Partitions sequences through  motifs discovery using the goops algorithm.")
     parser.add_argument("-o", "--output-prefix", type=str, default='goops_output', help='Prefix for file outputs. (Default: goops_output)')
-    parser.add_argument("gtf", help="Input Fasta file.")
+    parser.add_argument("fasta", help="Input Fasta file.")
     args = parser.parse_args()
 
 if __name__ == "__main__":
