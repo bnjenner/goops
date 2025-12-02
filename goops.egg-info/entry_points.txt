@@ -1,0 +1,2 @@
+[console_scripts]
+goops = goops.goops:main

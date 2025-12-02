@@ -1,0 +1,11 @@
+README.md
+setup.py
+goops/__init__.py
+goops/goops.py
+goops/motif.py
+goops/utils.py
+goops.egg-info/PKG-INFO
+goops.egg-info/SOURCES.txt
+goops.egg-info/dependency_links.txt
+goops.egg-info/entry_points.txt
+goops.egg-info/top_level.txt
