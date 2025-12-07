@@ -5,7 +5,7 @@ import random
 def main():
 
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument("-n", "--num-seq", type=int, default=1000, help="Minimum motif length")
+    parser.add_argument("-n", "--num-seq", type=int, default=100, help="Minimum motif length")
     parser.add_argument("-l", "--length", type=int, default=50, help="Seqeunce length")
     args = parser.parse_args()
 
