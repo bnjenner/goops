@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 
-#sys.path.insert(0, '/Users/ardenlee/Code/goops') 
+sys.path.insert(0, '/Users/ardenlee/Code/goops') 
 from goops import utils
 
 """
@@ -37,9 +37,11 @@ def generate_mms_from_motifs():
 
     print(mm1)
     print(mm2)
+    mm1 = mm1.T
 
-    #mm1.to_csv('mm1.csv', index=True)
-    #mm2.to_csv('mm2.csv', index=True)
+    mm2 = mm2.T
+    mm1.to_csv('mm1.csv', index=True)
+    mm2.to_csv('mm2.csv', index=True)
 
 # returns a list of probs of starting at each pos for one motif model
 def prob_motif_along_seq_for_mmX(seq, mmX):
@@ -47,15 +49,15 @@ def prob_motif_along_seq_for_mmX(seq, mmX):
     calc prob ( seq_window | motif ) at each start pos
     along the sequence
     """
-    len_motif = len(mmX.columns)
-    ind_list = mmX.index.tolist()
+    len_motif = len(mmX.index)
+    ind_list = mmX.columns.tolist()
     
     catch_prob_motif_at_each_pos = []
 
     # for each start position in seq
     for start_pos in range(len(seq) - len_motif):
         window = seq[start_pos:start_pos+len_motif]
-        print(window)
+        #print(window)
         prob_motif_here = 1
 
         # for each position in the motif
@@ -65,7 +67,7 @@ def prob_motif_along_seq_for_mmX(seq, mmX):
             nt_index = ind_list.index(nt_at_pos_x)
 
             # get probability that pos_x = nucleotide at x | mm1
-            prob_nt_at_pos_x = mmX.iloc[nt_index, motif_pos]
+            prob_nt_at_pos_x = mmX.iloc[motif_pos, nt_index]
 
             prob_motif_here *= prob_nt_at_pos_x #### there is an issue here somewhere
 
@@ -80,6 +82,8 @@ fasta_path = sys.argv[3]
 mm1 = pd.read_csv(mm1_path, index_col=0)
 mm2 = pd.read_csv(mm2_path, index_col=0)
 seq_dict = utils.read_fasta(fasta_path)
+
+
 
 seq_keys = list(seq_dict.keys())
 print(seq_keys)
