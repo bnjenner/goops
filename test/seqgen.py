@@ -10,7 +10,18 @@ def main():
     args = parser.parse_args()
 
     motif_list = ["TTTTTTTTTT",
-    			  "AAAAAAAAAA"]
+                  "TTTTTTTTTT",
+    			  "AAAAAAAAAA",
+                  "AAAAAAAAAA",
+                  "AAAAAAAAAA",
+                  "AAAAAAAAAA",
+                  "AAAAAAAAAA",
+                  "AAAAAAAAAA",
+                  "AAAAAAAAAA",
+                  "AAAAAAAAAA"]
+
+    # motif_list = ["TTTTTTTTTT",
+    #               "AAAAAAAAAA"]
 
     for i in range(args.num_seq):
 

@@ -23,8 +23,22 @@ def read_fasta(filename: str):
 ######################################################################
 # Buffer underflow safe log sum
 def logsafe_normalize(logs: np.ndarray):
-	print(logs)
-	log_sum = logsumexp(logs) 
-	logP = logs - log_sum
-	print(logP)
+	temp_log = logs
+	log_sum = logsumexp(temp_log) 
+	logP = temp_log - log_sum
 	return logP
+
+
+######################################################################
+# Random Biased PWM
+def random_mat(row: int, col: int):
+    # pwm = np.random.rand(row, col)
+    pwm = np.random.gamma(0.25, 1.0, size=(row, col))
+    pwm /= pwm.sum(axis=0, keepdims=True)
+    return pwm
+
+
+def random_vec(length: int):
+    pwm = np.random.gamma(0.5, 1.0, size=length)
+    pwm /= pwm.sum(axis=0, keepdims=True)
+    return pwm
