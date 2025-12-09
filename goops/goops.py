@@ -13,7 +13,7 @@ def main():
     # Parse Arguments
     parser = argparse.ArgumentParser(description="Partitions sequences through  motifs discovery using the goops algorithm.")
     parser.add_argument("-o", "--output-prefix", type=str, default='goops_output', help='Prefix for file outputs. (Default: goops_output)')
-    parser.add_argument("-m", "--min-length", type=int, default=6, help="Minimum motif length")
+    parser.add_argument("-m", "--min-length", type=int, default=8, help="Minimum motif length")
     parser.add_argument("-M", "--max-length", type=int, default=10, help="Maximum motif length")
     parser.add_argument("-a", "--algorithm", type=str, default="EM", help="Algorithm for motif discovery. Options are 'EM' (Expectation-Maximization) or 'MH' (Metropolis-Hastings)")
     parser.add_argument("--count", type=int, default=1, help="Number of times to repeat an action.")
