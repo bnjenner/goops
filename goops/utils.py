@@ -60,9 +60,9 @@ def random_vec(length: int):
 # Convert to Pandas DF
 def convert_to_df(pwm: ndarray):
     pwm = pd.DataFrame(
-        pwm.T.reshape(pwm.shape[2], pwm.shape[1]),
+        pwm.T.reshape(pwm.shape[1], pwm.shape[0]),
         columns=["A", "C", "G", "T"],
-        index=range(pwm.shape[2]),
+        index=range(pwm.shape[1]),
     )
     return pwm
 
@@ -80,6 +80,7 @@ def make_logo(pwm: ndarray, prefix: str):
 
     entropies = np.array([entropy(row) for row in pwm.T])
     pwm = convert_to_df(pwm)
+    pwm.to_csv(prefix + ".txt", index=False, sep="\t")
     pwm = pwm * (2 - entropies[:, None]) # Scale by information content
 
     logo = logomaker.Logo(pwm,

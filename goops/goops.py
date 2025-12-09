@@ -35,7 +35,8 @@ def main():
     # Discover Motifs
     goops.discover(min_length = args.min_length,
                    max_length = args.max_length, 
-                   algo = args.algorithm)
+                   algo = args.algorithm,
+                   prefix = args.output_prefix)
 
 if __name__ == "__main__":
     main()

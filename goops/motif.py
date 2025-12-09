@@ -95,21 +95,25 @@ class Goops:
                         Q[:,g] = utils.logsafe_normalize(list(Q[:,g]))
                         max_Q_indicies[g][l] = np.argmax(Q[:,g])
 
+                    sum_Q = np.sum(Q, axis=0)
+                    seq_Q = sum_Q / np.sum(sum_Q)
+
                     # M Step
                     for g in groups:
                         not_g = int(not bool(g))
                         for i in range(last_pos):
-                            norm = utils.logsafe_normalize(list(Q[i,:]))
-                            # weight = np.exp(Q[i][g]) / (np.exp(norm[not_g]) + 0.01)
-                            weight = np.exp(Q[i][g]) + np.exp(norm[g])
-                            _gamma_tp1[g] += np.exp(norm[g])
-                            _lambda_tp1[g][l] += weight
+                            # norm = utils.logsafe_normalize(list(Q[i,:]))
+                            # weight = np.exp(Q[i][g])
+                            # weight = np.exp(Q[i][g]) + np.exp(norm[g])
+                            # _gamma_tp1[g] += np.exp(norm[g])
+                            # _lambda_tp1[g][l] += weight
+                            weight = seq_Q[g]
+                            _gamma_tp1[g] +=  np.exp(Q[i][g]) * weight
+                            _lambda_tp1[g][l] += np.exp(Q[i][g]) * weight
                             for m in range(lengths[l]):
                                 for n, b in bases.items():
                                     if seq[i+m] == n:
-                                        _models_tp1[g][l][b][m] += np.exp(Q[i][g])
-
-            print(max_Q_indicies)
+                                        _models_tp1[g][l][b][m] += np.exp(Q[i][g]) * weight
 
 
             # Noramlize models to sum to 1
@@ -123,10 +127,10 @@ class Goops:
 
             # Check Convergence
             diff = np.abs(np.array((_gamma_tp1 - _gamma)))
-            if bool(np.all(diff < 0.0001)):
+            print(diff)
+            if ITERATIONS > 5 and bool(np.all(diff < 0.0001)):
                 CONVERGED = True
-                print(np.argmax(max_Q_indicies, axis=1))
-                return 
+                # print(np.argmax(max_Q_indicies, axis=1))
 
 
             _gamma = _gamma_tp1.copy()
@@ -134,7 +138,7 @@ class Goops:
             _models = _models_tp1
             ITERATIONS += 1
 
-        return _models[0], _models[1]
+        return _models[0][0], _models[1][0]
 
 
     ######################################################################
@@ -144,7 +148,7 @@ class Goops:
 
     ######################################################################
     # Discover Motif Auxillary Functions
-    def discover(self, min_length: int, max_length: int, algo: str = "EM"):
+    def discover(self, min_length: int, max_length: int, algo: str, prefix: str):
 
         print("Parameters:")
         print(" - Min-Length:", min_length)
@@ -153,6 +157,8 @@ class Goops:
 
 
         for i in range(1):
+
+            max_length = min_length
 
 
             # _gamma is a numpy array 
@@ -172,8 +178,9 @@ class Goops:
                 print("ERROR: Algorithm is not implemented yet.")
                 sys.exit(1)
 
-            utils.make_logo(final1, "Group_1_" + str(i))
-            utils.make_logo(final2, "Group_2_" + str(i))
+
+            utils.make_logo(np.array(final1), prefix + "_Group_1_" + str(i))
+            utils.make_logo(np.array(final2), prefix + "_Group_2_" + str(i))
 
 
 
