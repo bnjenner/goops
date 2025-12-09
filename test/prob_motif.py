@@ -51,13 +51,14 @@ def prob_motif_along_seq_for_mmX(seq, mmX):
     """
     len_motif = len(mmX.index)
     ind_list = mmX.columns.tolist()
+    print(ind_list)
     
     catch_prob_motif_at_each_pos = []
 
     # for each start position in seq
     for start_pos in range(len(seq) - len_motif):
         window = seq[start_pos:start_pos+len_motif]
-        #print(window)
+        print(window)
         prob_motif_here = 1
 
         # for each position in the motif
@@ -75,15 +76,17 @@ def prob_motif_along_seq_for_mmX(seq, mmX):
 
     return catch_prob_motif_at_each_pos
 
+
+
 mm1_path = sys.argv[1]
 mm2_path = sys.argv[2]
 fasta_path = sys.argv[3]
 
-mm1 = pd.read_csv(mm1_path, index_col=0)
-mm2 = pd.read_csv(mm2_path, index_col=0)
+mm1 = pd.read_csv(mm1_path, sep="\t")
+mm2 = pd.read_csv(mm2_path, sep="\t")
 seq_dict = utils.read_fasta(fasta_path)
 
-
+print(mm1)
 
 seq_keys = list(seq_dict.keys())
 print(seq_keys)
