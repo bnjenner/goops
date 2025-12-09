@@ -1,7 +1,9 @@
 import logging
+import logomaker
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 from scipy.special import logsumexp
-
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 log = logging.getLogger(__name__)
@@ -32,13 +34,37 @@ def logsafe_normalize(logs: np.ndarray):
 ######################################################################
 # Random Biased PWM
 def random_mat(row: int, col: int):
-    # pwm = np.random.rand(row, col)
-    pwm = np.random.gamma(0.25, 1.0, size=(row, col))
+    pwm = np.random.gamma(1.0, 1.0, size=(row, col))
     pwm /= pwm.sum(axis=0, keepdims=True)
     return pwm
+
+######################################################################
+# Random Biased PWM
+def opp_mat(mat: np.ndarray):
+	opp = 1.0 / mat
+	opp /= opp.sum(axis=0, keepdims=True)
+	return opp
 
 
 def random_vec(length: int):
-    pwm = np.random.gamma(0.5, 1.0, size=length)
+    pwm = np.random.beta(20, 20, size=length)
     pwm /= pwm.sum(axis=0, keepdims=True)
     return pwm
+
+
+def make_logo(pwm, prefix: str):
+
+    pwm = pd.DataFrame(
+        np.exp(pwm.T).reshape(pwm.shape[2], pwm.shape[1]),
+        columns=["A", "C", "G", "T"],
+        index=range(pwm.shape[2]),
+    )
+
+    logo = logomaker.Logo(pwm)
+    logo.style_spines(visible=False)
+    logo.style_spines(spines=["left", "bottom"], visible=True)
+    logo.ax.set_ylabel("Position")
+    logo.ax.set_ylabel("Frequency")
+    logo.ax.set_title(prefix.split("/")[-1])
+
+    plt.savefig(prefix + ".png")
