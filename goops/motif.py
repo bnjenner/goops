@@ -25,23 +25,13 @@ class Goops:
     def __initialize_models(self, min_length: int, max_length: int, num_groups: int, init: bool = False):
         
         num_lengths = (max_length - min_length + 1)
-
-        # Uniform Length and Group Probs
-        # g_prob = math.log(1 / num_groups)
-        # l_prob = math.log(1 / num_lengths)
-        # n_prob = math.log(0.25)
-
         g_prob = 1 / num_groups
         l_prob = 1 / num_lengths
         n_prob = 0.25
 
-
-        if not init:
-            _gamma = np.full(num_groups, g_prob, dtype=np.float64)
-            _lambda = [np.full(num_lengths, l_prob, dtype=np.float64) for g in range(num_groups)]
-        else:
-            _gamma = utils.random_vec(num_groups)
-            _lambda = [utils.random_vec(num_lengths) for g in range(num_groups)]
+        # Uniform Priors
+        _gamma = np.full(num_groups, g_prob, dtype=np.float64)
+        _lambda = [np.full(num_lengths, l_prob, dtype=np.float64) for g in range(num_groups)]
         _models = [[] for g in range(num_groups)]
         
         # Initlize length motif model with nucleotide bias
@@ -74,21 +64,11 @@ class Goops:
                                                                         num_groups = 2,
                                                                         init = False)
 
-
         ITERATIONS = 0
-        temperature = len(self.sequeces.keys()) / 2
         while ITERATIONS < 20:
 
             print("Iteration:", ITERATIONS)
-
             print(_gamma)
-            # for l in _lambda:
-            #     print(np.exp(l))
-            # for m in _models[0]:
-            #     print(np.exp(m))
-            # for m in _models[1]:
-            #     print(np.exp(m))
-            # cont = input("BEFORE")
 
             # Iterate through sequences
             for header, seq in self.sequeces.items():
@@ -108,75 +88,41 @@ class Goops:
                                 if x >= i and x <= end_pos:
                                     Q[i][g] += np.log(_models[g][l][b][x - i])
                                 else:
-                                    Q[i][g] += (math.log(0.25)) # Uniform Background
-                                # print((np.log(_gamma[g]), np.log(_lambda[g][l]), math.log(1 / last_pos)))
-                                Q[i][g] += ((np.log(_gamma[g]) + np.log(_lambda[g][l]) + math.log(1 / last_pos)))
+                                    Q[i][g] += math.log(0.25) # Uniform Background
+                                Q[i][g] += np.log(_gamma[g]) + np.log(_lambda[g][l]) + np.log(1 / last_pos)
 
                         Q[:,g] = utils.logsafe_normalize(list(Q[:,g]))
 
-                        # M Step
+
+                    # M Step
+                    for g in groups:
+                        not_g = int(not bool(g))
                         for i in range(last_pos):
-                            _gamma_tp1[g] += np.exp(Q[i][g])
-                            _lambda_tp1[g][l] += np.exp(Q[i][g])
-                            # _gamma_tp1[g] = logsumexp([_gamma_tp1[g], Q[i][g]])
-                            # _lambda_tp1[g][l] = logsumexp([_lambda_tp1[g][l], Q[i][g]])
-                            _lambda_tp1[g][l] += np.exp(Q[i][g])
+                            norm = utils.logsafe_normalize(list(Q[i,:]))
+                            # weight = np.exp(Q[i][g]) / (np.exp(norm[not_g]) + 0.01)
+                            weight = np.exp(Q[i][g]) + np.exp(norm[g])
+                            _gamma_tp1[g] += np.exp(norm[g])
+                            _lambda_tp1[g][l] += weight
                             for m in range(lengths[l]):
                                 for n, b in bases.items():
                                     if seq[i+m] == n:
-                                        # _models_tp1[g][l][b][m] = logsumexp([_models_tp1[g][l][b][m], Q[i][g]])
                                         _models_tp1[g][l][b][m] += np.exp(Q[i][g])
 
 
             # Noramlize models to sum to 1
-            # _gamma_tp1 = utils.logsafe_normalize(np.array(_gamma_tp1))
             _gamma_tp1 /= np.sum(_gamma_tp1)
             for g in groups:
-                # _lambda_tp1[g] = utils.logsafe_normalize(_lambda_tp1[g])
                 _lambda_tp1[g] /= np.sum( _lambda_tp1[g])
-
                 for m in range(len(_models_tp1[g])):
                     for c in range(_models_tp1[g][m].shape[1]):
-                        # _models_tp1[g][m][:,c] = utils.logsafe_normalize(_models_tp1[g][m][:,c]) 
                          _models_tp1[g][m][:,c] /= np.sum(_models_tp1[g][m][:,c])
 
             _gamma = _gamma_tp1
             _lambda = _lambda_tp1
             _models = _models_tp1
-            # utils.make_logo(_models[0], "Group_1")
-            # utils.make_logo(_models[1], "Group_2")
-
-            # for l in _lambda:
-            #     print(l)
-            # for m in _models[0]:
-            #     print(m)
-            # for m in _models[1]:
-            #     print(m)
-            # cont = input("TEST")
             ITERATIONS += 1
 
-
-        utils.make_logo(_models[0], "Group_1")
-        utils.make_logo(_models[1], "Group_2")
-
-        # print(np.exp(_gamma))
-        # # print(np.exp(_gamma_tp1))
-        # for l in _lambda:
-        #     print(np.exp(l))
-        # # for l in _lambda_tp1:
-        # #     print(np.exp(l))
-        # print("GROUP 1")
-        # for m in _models[0]:
-        #     print(np.exp(m))
-
-        # print("GROUP 2")
-        # for m in _models[1]:
-        #     print(np.exp(m))
-        # cont = input("TEST")
-
-
-
-        return
+        return _models[0], _models[1]
 
 
     ######################################################################
@@ -188,29 +134,35 @@ class Goops:
     # Discover Motif Auxillary Functions
     def discover(self, min_length: int, max_length: int, algo: str = "EM"):
 
-
-        max_length = min_length
-        _models, _lambda, _gamma = self.__initialize_models(min_length, 
-                                                            max_length,
-                                                            num_groups = 2,
-                                                            init = True)
-
         print("Parameters:")
         print(" - Min-Length:", min_length)
         print(" - Max-Length:", max_length)
         print(" - Algorithm:", algo)
-        print(" - _models:", len(_models), len(_models[0]), _models[0][0].shape)
-        print(" - _lambda:", len(_lambda), _lambda[0].shape)
-        print(" - _gamma:", len(_gamma))
 
-        # Run Aglorithm
-        if algo == "EM":
-            self.__discover_EM(_models, _lambda, _gamma)
-        elif algo == "MH":
-            self.__discover_MH(models)
-        else:
-            print("ERROR: Algorithm is not implemented yet.")
-            sys.exit(1)
+
+        for i in range(1):
+            max_length = min_length
+            
+            _models, _lambda, _gamma = self.__initialize_models(min_length, 
+                                                                max_length,
+                                                                num_groups = 2,
+                                                                init = True)
+
+            # print(" - _models:", len(_models), len(_models[0]), _models[0][0].shape)
+            # print(" - _lambda:", len(_lambda), _lambda[0].shape)
+            # print(" - _gamma:", len(_gamma))
+
+            # Run Aglorithm
+            if algo == "EM":
+                final1, final2 = self.__discover_EM(_models, _lambda, _gamma)
+            elif algo == "MH":
+                self.__discover_MH(models)
+            else:
+                print("ERROR: Algorithm is not implemented yet.")
+                sys.exit(1)
+
+            utils.make_logo(final1, "Group_1_" + str(i))
+            utils.make_logo(final2, "Group_2_" + str(i))
 
 
 

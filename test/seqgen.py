@@ -9,29 +9,29 @@ def main():
     parser.add_argument("-l", "--length", type=int, default=50, help="Seqeunce length")
     args = parser.parse_args()
 
-    # motif_list = ["TTTTTTTT",
-    #               "TTTTTTTT",
-    #               "TTTTTTTT",
-    #               "AAAAAAAA",
-    #               "AAAAAAAA",
-    #               "AAAAAAAA",
-    #               "AAAAAAAA",
-    #               "AAAAAAAA",
-    #               "AAAAAAAA",
-    #               "AAAAAAAA"]
-
-    # motif_list = ["ACGTTGCA",
-    #               "TGCAACGT"]
-
     motif_list = ["TTTTTTTT",
+                  "TTTTTTTT",
+                  "TTTTTTTT",
+                  "AAAAAAAA",
+                  "AAAAAAAA",
+                  "AAAAAAAA",
+                  "AAAAAAAA",
+                  "AAAAAAAA",
+                  "AAAAAAAA",
                   "AAAAAAAA"]
+
+    # motif_list = ["",
+    #               ""]
+
+    # motif_list = ["TTTTTTTT",
+    #               "AAAAAAAA"]
 
     for i in range(args.num_seq):
 
         # Choose Motif and position
-        motif = motif_list[i % 2]
+        # motif = motif_list[i % 2]
 
-        # motif = random.choice(motif_list)
+        motif = random.choice(motif_list)
         l = len(motif)
         motif_pos = random.randint(0, (args.length - l)-1)
 

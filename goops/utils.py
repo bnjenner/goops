@@ -34,7 +34,8 @@ def logsafe_normalize(logs: np.ndarray):
 ######################################################################
 # Random Biased PWM
 def random_mat(row: int, col: int):
-    pwm = np.random.gamma(1.0, 1.0, size=(row, col))
+    pwm = np.random.gamma(0.1, 1.0, size=(row, col))
+    # pwm = np.random.beta(100, 100, size=(row, col))
     pwm /= pwm.sum(axis=0, keepdims=True)
     return pwm
 
@@ -47,7 +48,7 @@ def opp_mat(mat: np.ndarray):
 
 
 def random_vec(length: int):
-    pwm = np.random.beta(20, 20, size=length)
+    pwm = np.random.beta(100, 100, size=length)
     pwm /= pwm.sum(axis=0, keepdims=True)
     return pwm
 
@@ -55,16 +56,25 @@ def random_vec(length: int):
 def make_logo(pwm, prefix: str):
 
     pwm = pd.DataFrame(
-        np.exp(pwm.T).reshape(pwm.shape[2], pwm.shape[1]),
+        pwm.T.reshape(pwm.shape[2], pwm.shape[1]),
         columns=["A", "C", "G", "T"],
         index=range(pwm.shape[2]),
     )
 
-    logo = logomaker.Logo(pwm)
+
+    # H = -(pwm * np.log2(pwm + 1e-9)).sum(axis=0)  # entropy per position
+    # print(H)
+    # R = 2 - H                                   # information content (DNA)
+    # print(R)
+    # pwm = pwm * H  # multiply each column by its information content
+
+
+    logo = logomaker.Logo(pwm,
+    					  shade_below=.5,
+                          fade_below=.5)
     logo.style_spines(visible=False)
     logo.style_spines(spines=["left", "bottom"], visible=True)
     logo.ax.set_ylabel("Position")
     logo.ax.set_ylabel("Frequency")
     logo.ax.set_title(prefix.split("/")[-1])
-
     plt.savefig(prefix + ".png")
