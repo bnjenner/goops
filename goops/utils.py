@@ -22,6 +22,7 @@ def read_fasta(filename: str):
 				seqs[curr] += line.strip()
 	return seqs
 
+
 ######################################################################
 # Buffer underflow safe log sum
 def logsafe_normalize(logs: np.ndarray):
@@ -40,38 +41,51 @@ def random_mat(row: int, col: int):
     return pwm
 
 ######################################################################
-# Random Biased PWM
+# Random Opposite PWM
 def opp_mat(mat: np.ndarray):
 	opp = 1.0 / mat
 	opp /= opp.sum(axis=0, keepdims=True)
 	return opp
 
 
+######################################################################
+# Random Biased Vector
 def random_vec(length: int):
     pwm = np.random.beta(100, 100, size=length)
     pwm /= pwm.sum(axis=0, keepdims=True)
     return pwm
 
 
-def make_logo(pwm, prefix: str):
-
+######################################################################
+# Convert to Pandas DF
+def convert_to_df(pwm: ndarray):
     pwm = pd.DataFrame(
         pwm.T.reshape(pwm.shape[2], pwm.shape[1]),
         columns=["A", "C", "G", "T"],
         index=range(pwm.shape[2]),
     )
+    return pwm
 
 
-    # H = -(pwm * np.log2(pwm + 1e-9)).sum(axis=0)  # entropy per position
-    # print(H)
-    # R = 2 - H                                   # information content (DNA)
-    # print(R)
-    # pwm = pwm * H  # multiply each column by its information content
+######################################################################
+# Shannon's Entropy
+def entropy(probs: np.array):
+    nonzero = probs > 0
+    return -np.sum(probs[nonzero] * np.log2(probs[nonzero]))
 
+
+######################################################################
+# Make Motif Logo
+def make_logo(pwm: ndarray, prefix: str):
+
+    entropies = np.array([entropy(row) for row in pwm.T])
+    pwm = convert_to_df(pwm)
+    pwm = pwm * (2 - entropies[:, None]) # Scale by information content
 
     logo = logomaker.Logo(pwm,
     					  shade_below=.5,
                           fade_below=.5)
+    logo = logomaker.Logo(pwm)
     logo.style_spines(visible=False)
     logo.style_spines(spines=["left", "bottom"], visible=True)
     logo.ax.set_ylabel("Position")
