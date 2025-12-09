@@ -31,19 +31,17 @@ class Goops:
 
         # Uniform Priors
         _gamma = np.full(num_groups, g_prob, dtype=np.float64)
-        _lambda = [np.full(num_lengths, l_prob, dtype=np.float64) for g in range(num_groups)]
+        _lambda = np.array([np.full(num_lengths, l_prob, dtype=np.float64) for g in range(num_groups)])
         _models = [[] for g in range(num_groups)]
-        
+
         # Initlize length motif model with nucleotide bias
-        for l in range(min_length, max_length+1):
-            if init:
-                _models[0].append(utils.random_mat(4, l))
-                _models[1].append(utils.opp_mat(_models[0][-1]))
-            else:
-                _models[0].append(np.full((4, l), 0.25, dtype=np.float64))
-                _models[1].append(np.full((4, l), 0.25, dtype=np.float64))
-            _models[0] = np.array(_models[0])
-            _models[1] = np.array(_models[1])
+        for g in range(num_groups):
+            for l in range(min_length, max_length+1):
+                if init:
+                    _models[g].append(utils.random_mat(4, l))
+                else:
+                    _models[g].append(np.full((4, l), 0.25, dtype=np.float64))
+
         return _models, _lambda, _gamma
 
 
@@ -65,10 +63,13 @@ class Goops:
                                                                         init = False)
 
         ITERATIONS = 0
-        while ITERATIONS < 20:
+        CONVERGED = False
+        while not CONVERGED and ITERATIONS < 20:
 
             print("Iteration:", ITERATIONS)
             print(_gamma)
+
+            max_Q_indicies = np.zeros((num_groups, num_lengths))
 
             # Iterate through sequences
             for header, seq in self.sequeces.items():
@@ -92,7 +93,7 @@ class Goops:
                                 Q[i][g] += np.log(_gamma[g]) + np.log(_lambda[g][l]) + np.log(1 / last_pos)
 
                         Q[:,g] = utils.logsafe_normalize(list(Q[:,g]))
-
+                        max_Q_indicies[g][l] = np.argmax(Q[:,g])
 
                     # M Step
                     for g in groups:
@@ -108,6 +109,8 @@ class Goops:
                                     if seq[i+m] == n:
                                         _models_tp1[g][l][b][m] += np.exp(Q[i][g])
 
+            print(max_Q_indicies)
+
 
             # Noramlize models to sum to 1
             _gamma_tp1 /= np.sum(_gamma_tp1)
@@ -117,7 +120,16 @@ class Goops:
                     for c in range(_models_tp1[g][m].shape[1]):
                          _models_tp1[g][m][:,c] /= np.sum(_models_tp1[g][m][:,c])
 
-            _gamma = _gamma_tp1
+
+            # Check Convergence
+            diff = np.abs(np.array((_gamma_tp1 - _gamma)))
+            if bool(np.all(diff < 0.0001)):
+                CONVERGED = True
+                print(np.argmax(max_Q_indicies, axis=1))
+                return 
+
+
+            _gamma = _gamma_tp1.copy()
             _lambda = _lambda_tp1
             _models = _models_tp1
             ITERATIONS += 1
@@ -141,22 +153,21 @@ class Goops:
 
 
         for i in range(1):
-            max_length = min_length
+
+
+            # _gamma is a numpy array 
+            # _labmda is a numpy array of numpy arrays
+            # _models is a list of lists of numpy arrays (inhomogenous dimensions)
             
             _models, _lambda, _gamma = self.__initialize_models(min_length, 
                                                                 max_length,
                                                                 num_groups = 2,
                                                                 init = True)
 
-            # print(" - _models:", len(_models), len(_models[0]), _models[0][0].shape)
-            # print(" - _lambda:", len(_lambda), _lambda[0].shape)
-            # print(" - _gamma:", len(_gamma))
 
             # Run Aglorithm
             if algo == "EM":
                 final1, final2 = self.__discover_EM(_models, _lambda, _gamma)
-            elif algo == "MH":
-                self.__discover_MH(models)
             else:
                 print("ERROR: Algorithm is not implemented yet.")
                 sys.exit(1)
