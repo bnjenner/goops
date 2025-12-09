@@ -2,3 +2,4 @@ build/
 *.png
 tmp/
 goops/__pycache__
+*.txt
