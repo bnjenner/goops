@@ -73,10 +73,10 @@ def main():
         for group, res in results["Motifs"].items():
             utils.make_logo(res["Motif"], args.output_prefix + "_" + group)
 
-    print(results["Groups"], file=sys.stderr)
-    for group, res in results["Motifs"].items():
-        print(group, file=sys.stderr)
-        print(res, file=sys.stderr)
+    # print(results["Groups"], file=sys.stderr)
+    # for group, res in results["Motifs"].items():
+    #     print(group, file=sys.stderr)
+    #     print(res, file=sys.stderr)
 
 if __name__ == "__main__":
     main()

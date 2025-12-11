@@ -31,7 +31,7 @@ class Goops:
         self.min_itererations = 5
         self.max_itererations = None
         self.pseudocount = 0.001
-        self.epsilon = 0.1
+        self.epsilon = 0.01
         self.bases = {"A": 0, "C": 1, "G": 2, "T": 3}
 
         # Results
@@ -99,7 +99,7 @@ class Goops:
             if not uniform:
                 _motifs[g] = [utils.random_mat(4, l) for l in range(self.min_length, self.max_length+1)]
             else:
-                _motifs[g] = [np.full((4, l), 0.25, dtype=np.float64) for l in range(self.min_length, self.max_length+1)]
+                _motifs[g] = [np.full((4, l), n_prob, dtype=np.float64) for l in range(self.min_length, self.max_length+1)]
 
         return _motifs, _lambda, _gamma
 
@@ -119,6 +119,7 @@ class Goops:
         while not converged and iterations < 20:
 
             log.info("Iteration: " + str(iterations))
+            print(np.sum(_gamma, axis = 1))
 
             x = 0
             _motifs_tp1, _lambda_tp1, _gamma_tp1 = self.__initialize_models(uniform = True)            
@@ -134,27 +135,43 @@ class Goops:
                     for g in groups:                  
                         for z in range(num_pos):     
                             Q[g][z] += self.motif_ll(seq, _motifs[g][l], start_pos = z)
-                            Q[g][z] += np.log(_gamma[g][x]) + np.log(_lambda[g][l]) + np.log(1 / num_pos)
+                            #Q[g][z] += np.log(_gamma[g][x]) + np.log(_lambda[g][l]) + np.log(1 / num_pos)
+                            Q[g][z] += np.log(0.5) + np.log(_lambda[g][l]) + np.log(1 / num_pos)
                         Q[g,:] = utils.logsafe_normalize(Q[g,:])
 
+                    Q_groups = Q.copy()
+                    for pos in range(Q_groups.shape[1]):
+                        Q_groups[:,pos] =  utils.logsafe_normalize(Q_groups[:,pos])
 
                     # M Step
+                    """
+                    Derivation of M step is not correct
+                    we probably need to normalize across groups
+                    for Q. 
+
+                    """
                     for g in groups:
+                        _gamma_tp1[g][x] += np.sum(np.exp(Q_groups[g,:]))
+                        _lambda_tp1[g][l] += np.sum(np.exp(Q[g,:]))
                         for z in range(num_pos):
-                            _gamma_tp1[g][x] += np.exp(Q[g][z])
-                            _lambda_tp1[g][l] += np.exp(Q[g][z])
                             for m in range(lengths[l]):
                                 for n, b in self.bases.items():
                                     if seq[z+m] == n:
                                         _motifs_tp1[g][l][b][m] += np.exp(Q[g][z])
+                    # for g in groups:
+                    #     for z in range(num_pos):
+                    #         _gamma_tp1[g][x] += np.exp(Q[g][z])
+                    #         _lambda_tp1[g][l] += np.exp(Q[g][z])
+                    #         for m in range(lengths[l]):
+                    #             for n, b in self.bases.items():
+                    #                 if seq[z+m] == n:
+                    #                     _motifs_tp1[g][l][b][m] += np.exp(Q[g][z])
 
                 x += 1 # Incr seq count
 
 
             # Noramlize models to sum to 1
-            print(_gamma_tp1)
             _gamma_tp1 /= np.sum(_gamma_tp1, axis = 0)
-            print(_gamma_tp1)
             for g in groups:
                 _lambda_tp1[g] /= np.sum(_lambda_tp1[g])
                 for m in range(len(_motifs_tp1[g])):
