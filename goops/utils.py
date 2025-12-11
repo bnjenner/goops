@@ -10,6 +10,43 @@ log = logging.getLogger(__name__)
 
 ######################################################################
 # Read fasta utility
+def parse_arguments():
+
+    # Parse Arguments
+    parser = argparse.ArgumentParser(description="Partitions sequences through  motifs discovery using the goops algorithm.")
+    parser.add_argument("-o", "--output-prefix", type=str, default='goops_output', help='Prefix for file outputs. (Default: goops_output)')
+    parser.add_argument("-g", "--groups", type=int, default=2, help="Number of motif groups (Min: 1)")
+    parser.add_argument("-m", "--min-length", type=int, default=8, help="Minimum motif length")
+    parser.add_argument("-M", "--max-length", type=int, default=10, help="Maximum motif length")
+    parser.add_argument("-a", "--algorithm", type=str, default="EM", help="Algorithm for motif discovery. Options are 'EM' (Expectation-Maximization) or 'MH' (Metropolis-Hastings)")
+    parser.add_argument("-i", "--iterations", type=int, default=20, help="Maximum number of iterations.")
+    parser.add_argument("fasta", help="Input Fasta file.")
+    args = parser.parse_args()
+
+    # Check Args Options
+    if args.algorithm not in ["EM", "MH"]:
+        parser.print_help()
+        print("\nERROR: Algorithm must be either 'EM' or 'MH'.")
+        sys.exit(1)
+    if args.groups < 1:
+        parser.print_help()
+        print("\nERROR: Group Number must be greater than or equal to 1.")
+        sys.exit(1)
+    if args.iterations < 1:
+        parser.print_help()
+        print("\nERROR: Max Iterations must be greater than or equal to 1.")
+        sys.exit(1)
+    if args.min_length > args.max_length:
+        parser.print_help()
+        print("\nERROR: Min Length greater than Max Length.")
+        sys.exit(1)
+
+    args = parser.parse_args()
+    return args
+
+
+######################################################################
+# Read fasta utility
 def read_fasta(filename: str):
 	seqs = {}
 	with open(filename, "r") as file:
@@ -76,17 +113,23 @@ def entropy(probs: np.array):
 
 ######################################################################
 # Make Motif Logo
-def make_logo(pwm: ndarray, prefix: str):
+def make_logo(pwm: ndarray, prefix: str, scale_by_info: bool = True, write_pwm_tsv: bool = True):
 
-    entropies = np.array([entropy(row) for row in pwm.T])
-    pwm = convert_to_df(pwm)
-    pwm.to_csv(prefix + ".txt", index=False, sep="\t")
-    pwm = pwm * (2 - entropies[:, None]) # Scale by information content
+    df = convert_to_df(pwm)
 
-    logo = logomaker.Logo(pwm,
-    					  shade_below=.5,
-                          fade_below=.5)
-    logo = logomaker.Logo(pwm)
+    # Write to TSV
+    if write_pwm_tsv:
+        df.to_csv(prefix + ".txt", index=False, sep="\t")
+
+
+    # Scale by information content
+    if scale_by_info:
+        entropies = np.array([entropy(row) for row in pwm.T])
+        df = df * (2 - entropies[:, None])
+
+    # Generate Logo
+    # logo = logomaker.Logo(df, shade_below=.5, fade_below=.5)
+    logo = logomaker.Logo(df)
     logo.style_spines(visible=False)
     logo.style_spines(spines=["left", "bottom"], visible=True)
     logo.ax.set_ylabel("Position")

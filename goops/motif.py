@@ -1,12 +1,12 @@
-import logging
+import sys
 import math
+import logging
 import numpy as np
-from scipy.special import logsumexp
-from scipy import stats
 from goops import utils
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 log = logging.getLogger(__name__)
+
 
 #########################################################################################################
 # Motif Discovery Class
@@ -15,130 +15,179 @@ class Goops:
     ######################################################################
     # Constructor
     def __init__(self, sequeces: dict):
+        
+        # Input Data
         self.sequeces = sequeces
-        self.motifs = None
+        self.num_seqs = len(sequeces)
+        
+        # Model Parameters
+        self.num_groups = None
+        self.min_length = None
+        self.max_length = None
+        self.num_lengths = None
+
+        # Algorithm Parameters
+        self.num_repeats = 1# 5
+        self.min_itererations = 5
+        self.max_itererations = None
         self.pseudocount = 0.001
+        self.epsilon = 0.1
+        self.bases = {"A": 0, "C": 1, "G": 2, "T": 3}
+
+        # Results
+        self.results = None
+
+
+    ######################################################################
+    # Set Clustering Parameters
+    def set_parameters(self, num_groups: int, min_length: int, max_length: int, max_iter: int):
+        self.num_groups = num_groups        
+        self.min_length = min_length
+        self.max_length = max_length
+        self.num_lengths = max_length - min_length + 1
+        self.max_itererations = max_iter
+
+
+
+    ######################################################################
+    # Evaluate Motif Likelihood
+    def motif_ll(self, seq: str, _motif: np.ndarray, start_pos: int = None):
+        
+        ll = 0
+        n = len(seq)
+        length = _motif.shape[1]
+        num_pos = n - length + 1
+
+        if start_pos is not None:
+            z = start_pos
+            end_pos = z + length - 1 
+            for pos in range(n):    
+                b = self.bases[seq[pos]]
+                if pos >= z and pos <= end_pos:
+                    ll += np.log(_motif[b][pos - z])
+                else:
+                    ll += math.log(0.25)
+
+        else:
+            for z in range(num_pos):
+                end_pos = z + length - 1 
+                for pos in range(n):    
+                    b = self.bases[seq[pos]]
+                    if pos >= z and pos <= end_pos:
+                        ll += np.log(_motif[b][pos - z])
+                    else:
+                        ll += math.log(0.25)
+
+        return ll
 
 
     ######################################################################
     # Initialize Motif Models
-    def __initialize_models(self, min_length: int, max_length: int, num_groups: int, init: bool = False):
+    def __initialize_models(self, uniform: bool = False):
         
-        num_lengths = (max_length - min_length + 1)
-        g_prob = 1 / num_groups
-        l_prob = 1 / num_lengths
+        g_prob = 1 / self.num_groups
+        l_prob = 1 / self.num_lengths
         n_prob = 0.25
 
         # Uniform Priors
-        _gamma = np.full(num_groups, g_prob, dtype=np.float64)
-        _lambda = np.array([np.full(num_lengths, l_prob, dtype=np.float64) for g in range(num_groups)])
-        _models = [[] for g in range(num_groups)]
+        _gamma  = np.full((self.num_groups, self.num_seqs), g_prob, dtype=np.float64)
+        _lambda = np.full((self.num_groups, self.num_lengths), l_prob, dtype=np.float64)
+        _motifs = [[] for g in range(self.num_groups)]
 
-        # Initlize length motif model with nucleotide bias
-        for g in range(num_groups):
-            for l in range(min_length, max_length+1):
-                if init:
-                    _models[g].append(utils.random_mat(4, l))
-                else:
-                    _models[g].append(np.full((4, l), 0.25, dtype=np.float64))
+        # Initlize Motif Model for all Groups and Lengths
+        for g in range(self.num_groups):
+            if not uniform:
+                _motifs[g] = [utils.random_mat(4, l) for l in range(self.min_length, self.max_length+1)]
+            else:
+                _motifs[g] = [np.full((4, l), 0.25, dtype=np.float64) for l in range(self.min_length, self.max_length+1)]
 
-        return _models, _lambda, _gamma
+        return _motifs, _lambda, _gamma
 
 
     ######################################################################
     # Expectation Maximization Goops Implementation
-    def __discover_EM(self, _models: list, _lambda: list, _gamma: np.ndarray):
+    def __discover_EM(self, _gamma: np.ndarray, _lambda: np.ndarray, _motifs: list):
 
-        bases = {"A": 0, "C": 1, "G": 2, "T": 3}
-        num_groups = len(_gamma)
-        num_lengths = _lambda[0].shape[0]
-        lengths = [m.shape[1] for m in _models[0]]
-        groups = [g for g in range(len(_gamma))]
+        G = self.num_groups
+        L = self.num_lengths
+        groups = [g for g in range(G)]
+        lengths = [l for l in range(self.min_length, self.max_length+1)]
 
-        group_Q = np.full(num_groups, math.log(self.pseudocount))
-        
-        _models_tp1, _lambda_tp1, _gamma_tp1 = self.__initialize_models(lengths[0], 
-                                                                        lengths[-1], 
-                                                                        num_groups = 2,
-                                                                        init = False)
+        iterations = 0
+        converged = False
+        max_likelihood_length = np.zeros((G, L))
+        while not converged and iterations < 20:
 
-        ITERATIONS = 0
-        CONVERGED = False
-        while not CONVERGED and ITERATIONS < 20:
+            log.info("Iteration: " + str(iterations))
 
-            print("Iteration:", ITERATIONS)
-            print(_gamma)
-
-            max_Q_indicies = np.zeros((num_groups, num_lengths))
-
-            # Iterate through sequences
+            x = 0
+            _motifs_tp1, _lambda_tp1, _gamma_tp1 = self.__initialize_models(uniform = True)            
+            
             for header, seq in self.sequeces.items():
-
-                # print(header, seq)
-
-                for l in range(num_lengths):
-                    last_pos = len(seq) - lengths[l] + 1 # Also number of possible positions
-                    Q = np.array([group_Q.copy() for q in range(last_pos)], dtype=object)
+                
+                for l in range(L):
+                    
+                    num_pos = len(seq) - lengths[l] + 1
+                    Q = np.full((G, num_pos), math.log(self.pseudocount), dtype=np.float64)
 
                     # E Step          
                     for g in groups:                  
-                        for i in range(last_pos):
-                            end_pos = i + lengths[l] - 1 # motif end pos
-                            for x in range(len(seq)):
-                                b = bases[seq[x]]
-                                if x >= i and x <= end_pos:
-                                    Q[i][g] += np.log(_models[g][l][b][x - i])
-                                else:
-                                    Q[i][g] += math.log(0.25) # Uniform Background
-                                Q[i][g] += np.log(_gamma[g]) + np.log(_lambda[g][l]) + np.log(1 / last_pos)
+                        for z in range(num_pos):     
+                            Q[g][z] += self.motif_ll(seq, _motifs[g][l], start_pos = z)
+                            Q[g][z] += np.log(_gamma[g][x]) + np.log(_lambda[g][l]) + np.log(1 / num_pos)
+                        Q[g,:] = utils.logsafe_normalize(Q[g,:])
 
-                        Q[:,g] = utils.logsafe_normalize(list(Q[:,g]))
-                        max_Q_indicies[g][l] = np.argmax(Q[:,g])
-
-                    sum_Q = np.sum(Q, axis=0)
-                    seq_Q = sum_Q / np.sum(sum_Q)
 
                     # M Step
                     for g in groups:
-                        not_g = int(not bool(g))
-                        for i in range(last_pos):
-                            # norm = utils.logsafe_normalize(list(Q[i,:]))
-                            # weight = np.exp(Q[i][g])
-                            # weight = np.exp(Q[i][g]) + np.exp(norm[g])
-                            # _gamma_tp1[g] += np.exp(norm[g])
-                            # _lambda_tp1[g][l] += weight
-                            weight = seq_Q[g]
-                            _gamma_tp1[g] +=  np.exp(Q[i][g]) * weight
-                            _lambda_tp1[g][l] += np.exp(Q[i][g]) * weight
+                        for z in range(num_pos):
+                            _gamma_tp1[g][x] += np.exp(Q[g][z])
+                            _lambda_tp1[g][l] += np.exp(Q[g][z])
                             for m in range(lengths[l]):
-                                for n, b in bases.items():
-                                    if seq[i+m] == n:
-                                        _models_tp1[g][l][b][m] += np.exp(Q[i][g]) * weight
+                                for n, b in self.bases.items():
+                                    if seq[z+m] == n:
+                                        _motifs_tp1[g][l][b][m] += np.exp(Q[g][z])
+
+                x += 1 # Incr seq count
 
 
             # Noramlize models to sum to 1
-            _gamma_tp1 /= np.sum(_gamma_tp1)
+            print(_gamma_tp1)
+            _gamma_tp1 /= np.sum(_gamma_tp1, axis = 0)
+            print(_gamma_tp1)
             for g in groups:
-                _lambda_tp1[g] /= np.sum( _lambda_tp1[g])
-                for m in range(len(_models_tp1[g])):
-                    for c in range(_models_tp1[g][m].shape[1]):
-                         _models_tp1[g][m][:,c] /= np.sum(_models_tp1[g][m][:,c])
-
+                _lambda_tp1[g] /= np.sum(_lambda_tp1[g])
+                for m in range(len(_motifs_tp1[g])):
+                    for c in range(_motifs_tp1[g][m].shape[1]):
+                         _motifs_tp1[g][m][:,c] /= np.sum(_motifs_tp1[g][m][:,c])
 
             # Check Convergence
             diff = np.abs(np.array((_gamma_tp1 - _gamma)))
-            print(diff)
-            if ITERATIONS > 5 and bool(np.all(diff < 0.0001)):
-                CONVERGED = True
-                # print(np.argmax(max_Q_indicies, axis=1))
+            if iterations > self.min_itererations and bool(np.all(diff < self.epsilon)):
+                converged = True
 
-
-            _gamma = _gamma_tp1.copy()
+            _gamma = _gamma_tp1
             _lambda = _lambda_tp1
-            _models = _models_tp1
-            ITERATIONS += 1
+            _motifs = _motifs_tp1
+            iterations += 1
 
-        return _models[0][0], _models[1][0]
+
+        """
+        12/11/25 BNJ: 
+            As of now, this is only going to return the motifs of the shortest lengths.
+            I envision the selection of the most likely motif and the classifications 
+            should also go here.
+        """
+
+        seq_ids = list(self.sequeces.keys())
+        classifications = np.argmax(_gamma, axis=0)
+        results = {"Groups": {seq: int(group) for seq, group in zip(seq_ids, classifications)},
+                   "Motifs": {}}
+
+        for g in groups:
+            results["Motifs"]["Group_" + str(g)] = {"Motif": _motifs[g][0], "LogLikelihood": ";)"}
+
+        return results
 
 
     ######################################################################
@@ -148,39 +197,47 @@ class Goops:
 
     ######################################################################
     # Discover Motif Auxillary Functions
-    def discover(self, min_length: int, max_length: int, algo: str, prefix: str):
+    def discover(self, algo: str, store = False):
 
-        print("Parameters:")
-        print(" - Min-Length:", min_length)
-        print(" - Max-Length:", max_length)
-        print(" - Algorithm:", algo)
+        """
+        MODEL PARAMETERS:
 
+            _gamma: Group parameter matrix.
+                - Dim: G x Number of Sequences
 
-        for i in range(1):
+            _lambda: Length parameter matrix.
+                - Dim: G x Number of Motif Lengths
 
-            max_length = min_length
+            _motifs: List (groups) or lists (lengths) of Motif model matrices
+                - Length: G
+                - Length: Number of Motif Lengths
+                - Dim: 4 x Length of Motif
 
+        """
 
-            # _gamma is a numpy array 
-            # _labmda is a numpy array of numpy arrays
-            # _models is a list of lists of numpy arrays (inhomogenous dimensions)
-            
-            _models, _lambda, _gamma = self.__initialize_models(min_length, 
-                                                                max_length,
-                                                                num_groups = 2,
-                                                                init = True)
+        results = None
+        for i in range(self.num_repeats):
 
+            """
+            12/11/25 BNJ: 
+                I Imagine this is were we will implement better landscape exploration
+            """
+        
+            _motifs, _lambda, _gamma = self.__initialize_models()
 
             # Run Aglorithm
             if algo == "EM":
-                final1, final2 = self.__discover_EM(_models, _lambda, _gamma)
+                results = self.__discover_EM(_gamma, _lambda, _motifs)
             else:
-                print("ERROR: Algorithm is not implemented yet.")
+                print("ERROR: Algorithm " + algo + " is not implemented yet.")
                 sys.exit(1)
 
+        # if true, store results in Goops object
+        if store:
+            self.results = results
 
-            utils.make_logo(np.array(final1), prefix + "_Group_1_" + str(i))
-            utils.make_logo(np.array(final2), prefix + "_Group_2_" + str(i))
+        return results
+
 
 
 

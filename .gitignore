@@ -2,3 +2,4 @@ build/
 tmp/
 goops/__pycache__
 *.txt
+goops_test_*
