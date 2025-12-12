@@ -66,17 +66,20 @@ def main():
                          max_iter = args.iterations)
 
     # Discover Motifs
-    results = goops.discover(algo = args.algorithm)
+    results = goops.discover(algo = args.algorithm, store = True)
 
     # Write output
     if  results is not None:
         for group, res in results["Motifs"].items():
             utils.make_logo(res["Motif"], args.output_prefix + "_" + group)
 
-    # print(results["Groups"], file=sys.stderr)
-    # for group, res in results["Motifs"].items():
-    #     print(group, file=sys.stderr)
-    #     print(res, file=sys.stderr)
+
+    classifications = goops.classify_seq(fasta)
+    with open(args.output_prefix + "_classifications.txt", "w") as fo:
+    
+        fo.write("\t".join(next(iter(classifications.values()))) + "\n")
+        for seq, mot in classifications.items():
+            fo.write("\t".join(list(mot.values())) + "\n")
 
 if __name__ == "__main__":
     main()
