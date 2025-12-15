@@ -28,8 +28,8 @@ class Goops:
         self.num_lengths = None
 
         # Algorithm Parameters
-        self.num_repeats = 5
-        self.explore_num = 3
+        self.num_repeats = 5 # number of iterations to explore start points
+        self.explore_num = 1 # number of start points for likelihood landscape exploration
         self.min_iterations = 5
         self.max_iterations = None
         self.pseudocount = 0.001
@@ -296,7 +296,7 @@ class Goops:
                     sys.exit(1)
                 classifications = self.classify_seq(self.sequences)
                 self.results = None
-                iter_LL = sum([float(classifications[header]["LL_Group_" + str(g)]) for header, seq in self.sequences.items() for g in range(self.num_groups)])
+                iter_LL = sum([float(classifications[header]["LL_Group_" + str(g)])/self.motif_ll(seq, np.array([[b] for b in params["Background"]]), params["Background"]) for header, seq in self.sequences.items() for g in range(self.num_groups)])
                 LL_dict[iter_LL] = params
             best_iter = LL_dict[max(LL_dict.keys())]
             results = self.__discover_EM(best_iter["Gamma"], best_iter["Lambda"], best_iter["Motif"], best_iter["Background"], False)
