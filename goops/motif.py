@@ -15,11 +15,11 @@ class Goops:
 
     ######################################################################
     # Constructor
-    def __init__(self, sequeces: dict):
+    def __init__(self, sequences: dict):
         
         # Input Data
-        self.sequeces = sequeces
-        self.num_seqs = len(sequeces)
+        self.sequences = sequences
+        self.num_seqs = len(sequences)
         
         # Model Parameters
         self.num_groups = None
@@ -28,9 +28,10 @@ class Goops:
         self.num_lengths = None
 
         # Algorithm Parameters
-        self.num_repeats = 1# 5
-        self.min_itererations = 5
-        self.max_itererations = None
+        self.num_repeats = 5
+        self.explore_num = 3
+        self.min_iterations = 5
+        self.max_iterations = None
         self.pseudocount = 0.001
         self.epsilon = 0.0001
         self.bases = {"A": 0, "C": 1, "G": 2, "T": 3}
@@ -46,7 +47,7 @@ class Goops:
         self.min_length = min_length
         self.max_length = max_length
         self.num_lengths = max_length - min_length + 1
-        self.max_itererations = max_iter
+        self.max_iterations = max_iter
 
 
 
@@ -84,6 +85,7 @@ class Goops:
 
     ######################################################################
     # Classify Sequences
+    
     def classify_seq(self, seq_dict: dict):
 
         if self.results is None:
@@ -110,7 +112,7 @@ class Goops:
 
     ######################################################################
     # Initialize Motif Models
-    def __initialize_models(self, uniform: bool = False, zeroes: bool = False):
+    def __initialize_models(self, uniform: bool = False, zeroes: bool = False, a: int = 100):
         
         if zeroes == True:
             g_prob = 0
@@ -131,7 +133,7 @@ class Goops:
         for g in range(self.num_groups):
             if not uniform:
                 if not zeroes:
-                    _motifs[g] = [utils.random_mat(4, l) for l in range(self.min_length, self.max_length+1)]
+                    _motifs[g] = [utils.random_mat(a, 4, l) for l in range(self.min_length, self.max_length+1)]
                 else:
                     _motifs[g] = [np.full((4, l), 0, dtype = np.float64) for l in range(self.min_length, self.max_length+1)]
             else:
@@ -142,26 +144,33 @@ class Goops:
 
     ######################################################################
     # Expectation Maximization Goops Implementation
-    def __discover_EM(self, _gamma: np.ndarray, _lambda: np.ndarray, _motifs: list, _background: list):
+    def __discover_EM(self, _gamma: np.ndarray, _lambda: np.ndarray, _motifs: list, _background: list, explore: bool = False):
 
         G = self.num_groups
         L = self.num_lengths
         groups = [g for g in range(G)]
         lengths = [l for l in range(self.min_length, self.max_length+1)]
+        if explore:
+            max_iter = self.num_repeats
+        else:
+            max_iter = max(self.min_iterations, self.max_iterations) - self.explore_num
 
         iterations = 0
         converged = False
         max_likelihood_length = np.zeros((G, L))
-        while not converged and iterations < self.max_itererations:
-
-            log.info("Iteration: " + str(iterations))
-            print(np.sum(_gamma / self.num_seqs, axis = 1))
+        while not converged and iterations < max_iter:
+            if not explore and self.explore_num > 1:
+                log.info("Iteration: " + str(iterations + self.explore_num))
+                print(np.sum(_gamma / self.num_seqs, axis = 1))
+            elif not explore:
+                log.info("Iteration: " + str(iterations))
+                print(np.sum(_gamma / self.num_seqs, axis = 1))
             # cont = input("Continue...")
 
             x = 0
             _motifs_tp1, _lambda_tp1, _gamma_tp1, _background_tp1 = self.__initialize_models(zeroes = True)
 
-            for header, seq in self.sequeces.items():
+            for header, seq in self.sequences.items():
 
                 # print(header, _gamma[:,x])
                 
@@ -208,20 +217,15 @@ class Goops:
                         _motifs_tp1[g][m][:,c] /= np.sum(_motifs_tp1[g][m][:,c])
 
 
-            """
-            12/15/25 EXM: 
-                Changed convergence to be based on motif model because of KL divergence side effects, but haven't experimented
-                with changing it back to be based on group parameters.
-            """
             # Check Convergence
-            diff = np.abs(np.subtract(np.array(_motifs_tp1), np.array(_motifs)))
-            if iterations > self.min_itererations and bool(np.all(diff < self.epsilon)):
+            diff = np.abs(np.subtract(np.array(_gamma_tp1), np.array(_gamma)))
+            if iterations > self.min_iterations and bool(np.all(diff < self.epsilon)):
                 converged = True
 
             _gamma = _gamma_tp1
             _lambda = _lambda_tp1
             _motifs = _motifs_tp1
-            print(_motifs)
+            _background = _background_tp1
             iterations += 1
 
 
@@ -232,15 +236,20 @@ class Goops:
             should also go here.
         """
 
-        seq_ids = list(self.sequeces.keys())
+        final_lens = np.argmax(_lambda, axis = 1)
+        seq_ids = list(self.sequences.keys())
         classifications = np.argmax(_gamma, axis=0)
         results = {"Groups": {seq: int(group) for seq, group in zip(seq_ids, classifications)},
                    "Motifs": {}, "Background": _background}
-
+        
         for g in groups:
-            results["Motifs"]["Group_" + str(g)] = {"Motif": _motifs[g][0], "LogLikelihood": ";)"}
+            results["Motifs"]["Group_" + str(g)] = {"Motif": _motifs[g][final_lens[g]], "LogLikelihood": ";)"}
 
-        return results
+        if explore:
+            params = {"Motif": _motifs, "Gamma": _gamma, "Lambda": _lambda, "Background": _background}
+            return results, params
+        else:
+            return results
 
 
     ######################################################################
@@ -269,21 +278,30 @@ class Goops:
         """
 
         results = None
-        for i in range(self.num_repeats):
+        if self.explore_num > 1:
+            LL_dict = {}
+            for i in range(self.explore_num):
 
-            """
-            12/11/25 BNJ: 
-                I Imagine this is were we will implement better landscape exploration
-            """
-        
-            _motifs, _lambda, _gamma, _background= self.__initialize_models()
+                a = (1 + i) * (100/self.num_repeats)
+            
+                _motifs, _lambda, _gamma, _background = self.__initialize_models(a = a)
 
-            # Run Aglorithm
-            if algo == "EM":
-                results = self.__discover_EM(_gamma, _lambda, _motifs, _background)
-            else:
-                print("ERROR: Algorithm " + algo + " is not implemented yet.")
-                sys.exit(1)
+                # Run Aglorithm
+                if algo == "EM":
+                    log.info("Exploration " + str(i) + ", Exploring Likelihood Landscape")
+                    results, params = self.__discover_EM(_gamma, _lambda, _motifs, _background, True)
+                    self.results = results
+                else:
+                    print("ERROR: Algorithm " + algo + " is not implemented yet.")
+                    sys.exit(1)
+                classifications = self.classify_seq(self.sequences)
+                self.results = None
+                iter_LL = sum([float(classifications[header]["LL_Group_" + str(g)]) for header, seq in self.sequences.items() for g in range(self.num_groups)])
+                LL_dict[iter_LL] = params
+            best_iter = LL_dict[max(LL_dict.keys())]
+            results = self.__discover_EM(best_iter["Gamma"], best_iter["Lambda"], best_iter["Motif"], best_iter["Background"], False)
+        else:
+            results = self.__discover_EM(_gamma, _lambda, _motifs, _background, False)
 
         # if true, store results in Goops object
         if store:

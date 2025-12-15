@@ -71,9 +71,9 @@ def logsafe_normalize(logs: np.ndarray):
 
 ######################################################################
 # Random Biased PWM
-def random_mat(row: int, col: int):
+def random_mat(a:int, row: int, col: int):
     # pwm = np.random.gamma(0.1, 1.0, size=(row, col))
-    pwm = np.random.beta(100, 100, size=(row, col))
+    pwm = np.random.beta(a, a, size=(row, col))
     pwm /= pwm.sum(axis=0, keepdims=True)
     return pwm
 
