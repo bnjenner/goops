@@ -29,7 +29,7 @@ class Goops:
 
         # Algorithm Parameters
         self.num_repeats = 5 # number of iterations to explore start points
-        self.explore_num = 1 # number of start points for likelihood landscape exploration
+        self.explore_num = 1 # number of start points for likelihood landscape exploration. Make this <1 to do likelihood landscape exploration.
         self.min_iterations = 5
         self.max_iterations = None
         self.pseudocount = 0.001
@@ -168,7 +168,8 @@ class Goops:
             # cont = input("Continue...")
 
             x = 0
-            _motifs_tp1, _lambda_tp1, _gamma_tp1, _background_tp1 = self.__initialize_models(zeroes = True)
+            #_motifs_tp1, _lambda_tp1, _gamma_tp1, _background_tp1 = self.__initialize_models(zeroes = True)
+            _motifs_tp1, _lambda_tp1, _gamma_tp1, _background = self.__initialize_models(zeroes = True)
 
             for header, seq in self.sequences.items():
 
@@ -200,13 +201,13 @@ class Goops:
                                 for n, b in self.bases.items():
                                     if seq[z+m] == n:
                                         _motifs_tp1[g][l][b][m] += (np.exp(Q[g][z]))
-                                        _background_tp1[b] += (1 - np.exp(Q[g][z]))
+                                        #_background_tp1[b] += (1 - np.exp(Q[g][z]))
 
                 x += 1 # Incr seq count
             
             # Noramlize models to sum to 1
             _gamma_tp1 /= np.sum(_gamma_tp1, axis = 0)
-            _background_tp1 /= np.sum(_background_tp1)
+            #_background_tp1 /= np.sum(_background_tp1)
             for g in groups:
                 _lambda_tp1[g] /= np.sum(_lambda_tp1[g])
                 for m in range(len(_motifs_tp1[g])):
@@ -225,7 +226,7 @@ class Goops:
             _gamma = _gamma_tp1
             _lambda = _lambda_tp1
             _motifs = _motifs_tp1
-            _background = _background_tp1
+            #_background = _background_tp1
             iterations += 1
 
 
@@ -301,6 +302,7 @@ class Goops:
             best_iter = LL_dict[max(LL_dict.keys())]
             results = self.__discover_EM(best_iter["Gamma"], best_iter["Lambda"], best_iter["Motif"], best_iter["Background"], False)
         else:
+            _motifs, _lambda, _gamma, _background = self.__initialize_models(a = 100)
             results = self.__discover_EM(_gamma, _lambda, _motifs, _background, False)
 
         # if true, store results in Goops object
