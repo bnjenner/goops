@@ -29,7 +29,7 @@ class Goops:
 
         # Algorithm Parameters
         self.num_repeats = 5 # number of iterations to explore start points
-        self.explore_num = 1 # number of start points for likelihood landscape exploration. Make this <1 to do likelihood landscape exploration.
+        self.explore_num = 3 # number of start points for likelihood landscape exploration. Make this <1 to do likelihood landscape exploration.
         self.min_iterations = 5
         self.max_iterations = None
         self.pseudocount = 0.001
