@@ -18,9 +18,11 @@ def parse_arguments():
     parser.add_argument("-o", "--output-prefix", type=str, default='goops_output', help='Prefix for file outputs. (Default: goops_output)')
     parser.add_argument("-g", "--groups", type=int, default=2, help="Number of motif groups (Min: 1)")
     parser.add_argument("-m", "--min-length", type=int, default=8, help="Minimum motif length. If min = max lengths, only that length will be considered.")
-    parser.add_argument("-M", "--max-length", type=int, default=10, help="Maximum motif length. If min = max lengths, only that length will be considered.")
+    parser.add_argument("-M", "--max-length", type=int, default=12, help="Maximum motif length. If min = max lengths, only that length will be considered.")
     parser.add_argument("-a", "--algorithm", type=str, default="EM", help="Algorithm for motif discovery. Options are 'EM' (Expectation-Maximization) or 'MH' (Metropolis-Hastings)")
     parser.add_argument("-i", "--iterations", type=int, default=20, help="Maximum number of iterations.")
+    parser.add_argument("-p", "--partial-iterations", type=int, default=3, help="Number of partial iterations with different model initializations.")
+    parser.add_argument("-d", "--disable-KL", action='store_true', help='Disables weighting by KL Divergence')
     parser.add_argument("fasta", help="Input Fasta file.")
     args = parser.parse_args()
 
@@ -63,15 +65,17 @@ def main():
     goops.set_parameters(num_groups = args.groups,
                          min_length = args.min_length,
                          max_length = args.max_length,
-                         max_iter = args.iterations)
+                         max_iter = args.iterations,
+                         explore_num = args.partial_iterations,
+                         disable_kl = args.disable_KL)
 
     # Discover Motifs
     results = goops.discover(algo = args.algorithm, store = True)
 
     # Write output
     if  results is not None:
-        for group, res in results["Motifs"].items():
-            utils.make_logo(res["Motif"], args.output_prefix + "_" + group)
+        for group, res in results["Groups"].items():
+            utils.make_logo(res["Motif"], args.output_prefix + "_Group" + str(group))
 
 
     classifications = goops.classify_seq(fasta)
