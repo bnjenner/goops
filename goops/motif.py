@@ -221,7 +221,7 @@ class Goops:
                     for c in range(_motifs_tp1[g][m].shape[1]):
                         _motifs_tp1[g][m][:,c] /= np.sum(_motifs_tp1[g][m][:,c])
                         if self.kl_weights:
-                            _motifs_tp1[g][m][:,c] *= np.sum(kl_div(_motifs_tp1[g][m][:,c], _background))
+                            _motifs_tp1[g][m][:,c] *= kl_div(_motifs_tp1[g][m][:,c], _background)
                             _motifs_tp1[g][m][:,c] /= np.sum(_motifs_tp1[g][m][:,c])
 
 
